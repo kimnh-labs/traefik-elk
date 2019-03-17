@@ -1,0 +1,58 @@
+version: '3.6'
+
+networks:
+  elastic-net:
+    name: elastic-net
+  traefik-net:
+    name: traefik-net
+
+services:
+  # Search and Analytics engine:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:6.6.2
+    restart: unless-stopped
+    networks:
+      - elastic-net
+    expose:
+      - 9200
+    volumes:
+      - .docker-data/elasticsearch:/usr/share/elasticsearch/data
+
+  # GUI tool:
+  kibana:
+    image: docker.elastic.co/kibana/kibana:6.6.2
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+    networks:
+      - elastic-net
+      - traefik-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.port=5601"
+      - "traefik.backend=kibana"
+      - "traefik.frontend.rule=Host:kibana.lc"
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+
+  # Run filebeat in docker
+  # https://www.elastic.co/guide/en/beats/filebeat/current/running-on-docker.html
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:6.6.2
+    user: root
+    restart: unless-stopped
+    # Disabling strict permission check:
+    # https://www.elastic.co/guide/en/beats/libbeat/6.6/config-file-permissions.html
+    command: ["--strict.perms=false"]
+    volumes:
+     - /var/run/docker.sock:/var/run/docker.sock:ro
+     - .docker-data/logs/traefik:/var/log/traefik
+     - ./etc/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+    #  - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    expose:
+      - 5601
+    networks:
+      - elastic-net
+    environment:
+      - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST:-elasticsearch}
+      - KIBANA_HOST=${KIBANA_HOST:-kibana}

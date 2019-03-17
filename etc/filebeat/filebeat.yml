@@ -1,0 +1,32 @@
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/traefik/access.log
+    fields_under_root: true
+    json.keys_under_root: true
+    json.add_error_key: true
+    json.message_key: log
+
+# Docker autodiscover provider supports hints in labels
+# https://www.elastic.co/guide/en/beats/filebeat/current/configuration-autodiscover-hints.html#configuration-autodiscover-hints
+# filebeat.autodiscover:
+#   providers:
+#     - type: docker
+#       hints.enabled: true
+
+processors:
+- add_cloud_metadata: ~
+
+# Elasticsearch Output
+output.elasticsearch:
+  hosts: '${ELASTICSEARCH_HOSTS:elasticsearch:9200}'
+
+# Kibana
+setup.kibana:
+  host: ${KIBANA_HOST}
+
+# Xpack Monitoring
+xpack.monitoring:
+  enabled: true
+  elasticsearch:

@@ -1,0 +1,49 @@
+version: '3.6'
+
+networks:
+  web-net:
+    name: web-net
+  traefik-net:
+    name: traefik-net
+
+services:
+  # Reverse proxy:
+  traefik:
+    restart: unless-stopped
+    image: traefik:1.7
+    command:
+      - --api
+      - --docker
+      - --docker.exposedByDefault=false
+      - --docker.network=traefik-net
+      - --logLevel=INFO
+      - --traefikLog.filePath=/var/log/traefik/traefik.log
+      - --traefikLog.format=json
+      - --accessLog.filePath=/var/log/traefik/access.log
+      - --accessLog.format=json
+    ports:
+      - 8000:80
+    networks:
+      - traefik-net
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - .docker-data/logs/traefik:/var/log/traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.port=8080"
+      - "traefik.backend=traefik"
+      - "traefik.frontend.rule=Host:traefik.lc"
+      - "co.elastic.logs/module=traefik"
+
+  # Node application:
+  web-app:
+    image: containous/whoami:latest
+    restart: always
+    networks:
+      - web-net
+      - traefik-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.port=80"
+      - "traefik.backend=web-app"
+      - "traefik.frontend.rule=Host:app.lc"
